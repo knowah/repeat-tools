@@ -4,15 +4,15 @@ import argparse
 import sys
 
 parser = argparse.ArgumentParser()
-parser.add_argument("infile", type=str, help="Input (tab-separated) RepeatMasker file (must be sorted)")
-parser.add_argument("breaks",  type=int, default=1000000, help="Breakpoints to merge upon")
+parser.add_argument("infile",  type=str, help="Input (tab-separated) RepeatMasker file (must be sorted)")
+parser.add_argument("breaks",  type=int, default=100000, help="Breakpoints to merge upon [default: 100000]")
 parser.add_argument("-s", "--seq_gap", type=int, default=0, help="Maximum (reference sequence) gap in bp between broken subelements")
 parser.add_argument("-r", "--rep_gap", type=int, default=1, help="Maximum gap between repEnd & repStart of broken subelements")
 parser.add_argument("-f", "--fix", action="store_true", help="Merge subelements at the breakpoint when unambiguous [NOT IMPLEMENTED]")
 args = parser.parse_args()
 
 if args.fix:
-	raise InputError("--fix not implemented! re-run without this option")
+	raise NotImplementedError("--fix is not yet implemented! Re-run without this option.")
 
 FIELDS = ['chrom', 'start', 'end', 'strand', 'repName', 'repClass', 'repFamily', 'repStart', 'repEnd', 'element_ID']
 class RM_Entry(object):
@@ -37,12 +37,22 @@ def process_line(ln):
 	return entry
 	#return [(tokens[i] if i not in num_fields else int(tokens[i])) for i in [5,6,7,9,10,11,12,13,14,16]]
 
+# process RepeatMasker file by line
 with open(args.infile) as inf:
 	prev = process_line(inf.readline())
 	merge_elements = False
-	elem_ids = (None, None)
+	elem_ids = (None, None) # when merge_elements == True, this stores the element IDs to merge
+
+	lineno = 1
 	for line in inf:
 		curr = process_line(line)
+		lineno += 1
+
+		# fail if input file not sorted
+		if prev.chrom == curr.chrom and curr.start < prev.start:
+			raise IOError("ERROR: Entries out of order (line {})".format(lineno))
+
+		# check if this element and the previous one need to be merged
 		if not merge_elements \
 		   and curr.start % args.breaks <= args.seq_gap \
 		   and curr.chrom == prev.chrom \
@@ -55,13 +65,14 @@ with open(args.infile) as inf:
 		        (curr.strand == "-" and prev.repStart - curr.repEnd <= args.rep_gap)):
 			merge_elements = True
 			elem_ids = (prev.element_ID, curr.element_ID)
-
+		
+		# merge elements if the element ID matches the ID to be changed
 		if merge_elements and curr.element_ID == elem_ids[1]:
 			curr.element_ID = elem_ids[0]
 		else:
 			merge_elements = False
 		
-		print(prev)
+		print(prev) # output new entry for the previous line
 		prev = curr
 	
 	print(prev) # print last line
