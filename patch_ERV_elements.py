@@ -41,4 +41,4 @@ with fopen(args.rmsk_file, 'rt') as inf:
 
 # iterate through incomplete elements
 for chrom in elements.keys():
-	
+	pass
