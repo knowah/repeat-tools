@@ -1,13 +1,5 @@
 #!/usr/bin/python3
 
-# read in data
-# convert to basic structure
-# determine what's missing
-# iterate through elements, joining:
-## complementary
-## solo
-## full
-
 from itertools import groupby
 
 class ElementType:
@@ -33,18 +25,33 @@ class ElementType:
 		return self.same_family_as(other) and (self.Meta == other.Meta or self.Meta is None or other.meta is None)
 
 class GenomicPosition:
-	def __init__(self, chrom, start, end, strand="*"):
+	def __init__(self, chrom, start, end, strand="*", strict=True):
 		if not isinstance(start, int):
 			raise ValueError("start must be an int")
 		if not isinstance(end, int):
 			raise ValueError("end must be an int")
 		if strand not in ["+", "-", "*"]:
 			raise ValueError("strand must be +, -, or *")
+		if end < start:
+			if strict:
+				raise ValueError("start must be >= end")
+			else:
+				start, end = end, start
 
 		self.chrom = chrom
 		self.start = start
 		self.end = end
 		self.strand = strand
+
+	def five_prime(self):
+		if self.strand == "-":
+			return self.end
+		return self.start
+
+	def three_prime(self):
+		if self.strand == "-":
+			return self.start
+		return self.end
 
 	def compatible_with(self, other, exact_strand=True):
 		if isinstance(other, GenomicPosition):
@@ -119,9 +126,16 @@ class TransposableElement:
 		if len(subelements) > 1 and not all([subelements[0].compatible_with(s, check_meta=False) for s in subelements[1:]]):
 			raise ValueError("Attempted to create TransposableElement with incompatible Subelements")
 
-		self.sub = subelements
-		self.id = elem_id
 		self.strand = subelements[0].pos.strand
+		self.chrom = subelements[0].pos.chrom
+		self.sub = arrange_subelements(subelements, self.strand)
+		self.id = elem_id
+
+	@staticmethod
+	def arrange_subelements(subs, strand=None):
+		if strand is None:
+			strand = s[0].pos.strand
+		return sorted(subs, key=lambda s: s.pos.five_prime(), reverse=(strand == "-"))
 
 	def compatible_with(self, other):
 		if isinstance(other, TransposableElement):
@@ -140,7 +154,16 @@ class TransposableElement:
 		if not self.compatible_with(other):
 			raise ValueError("Attempted to merge incompatible transposable elements")
 
-		self.sub.append(other.sub)
+		self.sub = arrange_subelements(self.sub + other.sub, strand=self.strand)
+	
+	def first(self):
+		return self.sub[0]
+
+	def last(self):
+		return self.sub[len(self.sub)-1]
+
+	def span(self):
+		return GenomicPosition(self.chrom, self.first().five_prime(), self.last().three_prime(), self.strand, strict=False)
 
 class ERV(TransposableElement):
 	def missing_5prime_LTR(self):
@@ -153,7 +176,7 @@ class ERV(TransposableElement):
 		return self.meta() == ["LTR"]
 	
 	def is_complete(self):
-		return not (self.missing_5prime_LTR or self.missing_3prime_LTR)
+		return not (self.missing_5prime_LTR() or self.missing_3prime_LTR())
 
 	def is_fully_structured(self):
 		return self.is_complete() and "internal" in self.meta()
