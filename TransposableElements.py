@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 from itertools import groupby
+import pyranges as pr
 
 class ElementType:
 	def __init__(self, rep_class, rep_family, rep_name, meta_type=None):
@@ -18,11 +19,11 @@ class ElementType:
 
 	def same_family_as(self, other):
 		if isinstance(other, ElementType):
-			return semf.Class == other.Class and self.Family == other.Family
+			return self.Class == other.Class and self.Family == other.Family
 		return False
 
 	def meta_matches(self, other):
-		return self.same_family_as(other) and (self.Meta == other.Meta or self.Meta is None or other.meta is None)
+		return self.same_family_as(other) and (self.Meta == other.Meta or self.Meta is None or other.Meta is None)
 
 class GenomicPosition:
 	def __init__(self, chrom, start, end, strand="*", strict=True):
@@ -60,6 +61,25 @@ class GenomicPosition:
 			else:
 				return self.chrom == other.chrom and (self.strand == other.strand or self.strand == "*" or other.strand == "*")
 		return False
+	
+	def flanked(self, flank):
+		return GenomicPosition(self.chrom, self.start - flank, self.end + flank, self.strand)
+
+	def flanked_3(self, flank):
+		if self.strand == "-":
+			return GenomicPosition(self.chrom, self.start - flank, self.end, self.strand)
+		return GenomicPosition(self.chrom, self.start, self.end + flank, self.strand)
+
+	def flanked_5(self, flank):
+		if self.strand == "-":
+			return GenomicPosition(self.chrom, self.start, self.end + flank, self.strand)
+		return GenomicPosition(self.chrom, self.start - flank, self.end, self.strand)
+
+	def __str__(self):
+		return "{}\t{}\t{}\t{}".join(self.chrom, self.start, self.end, self.strand)
+
+	def pr(self):
+		return pr.PyRanges(chromosomes=[self.chrom], starts=[self.start], ends=[self.end], strands=[self.strand])	
 
 class Subelement:
 	"""
@@ -67,21 +87,21 @@ class Subelement:
 	Has an ElementType, a GenomicPosition, and optionally a position denoting
 	the location of the subelement within the canonical reference for its ElementType.
 	"""
-	def __init__(self, elem_type, pos, rep_pos=None):
+	def __init__(self, elem_type, pos, rep_pos):
 		self.type = elem_type
 		self.pos = pos
 		self.rep_pos = rep_pos
 
-	def __init__(self, rep_class, rep_family, rep_name, \
-				 chrom, start, end, strand, \
-				 rep_start, rep_end):
-		self.type = ElementType(rep_class, rep_family, rep_name)
-		self.pos = GenomicPosition(chrom, start, end, strand)
-		self.rep_pos = [rep_start, rep_end]
+	#def __init__(self, rep_class, rep_family, rep_name, \
+	#			 chrom, start, end, strand, \
+	#			 rep_start, rep_end):
+	#	self.type = ElementType(rep_class, rep_family, rep_name)
+	#	self.pos = GenomicPosition(chrom, start, end, strand)
+	#	self.rep_pos = [rep_start, rep_end]
 
 	def compatible_with(self, other, check_meta=True):
 		if isinstance(other, Subelement) and self.pos.compatible_with(other.pos) \
-		   and (not check_meta or self.elem_type.meta_matches(other.elem_type)):
+		   and (not check_meta or self.type.meta_matches(other.type)):
 			return True
 		return False
 			
@@ -128,7 +148,7 @@ class TransposableElement:
 
 		self.strand = subelements[0].pos.strand
 		self.chrom = subelements[0].pos.chrom
-		self.sub = arrange_subelements(subelements, self.strand)
+		self.sub = TransposableElement.arrange_subelements(subelements, self.strand)
 		self.id = elem_id
 
 	@staticmethod
@@ -139,7 +159,7 @@ class TransposableElement:
 
 	def compatible_with(self, other):
 		if isinstance(other, TransposableElement):
-			return self.sub[0].compatible_with(other.sub[0])
+			return self.sub[0].compatible_with(other.sub[0], check_meta=False)
 		return False
 
 	def names(self):
@@ -148,29 +168,32 @@ class TransposableElement:
 	def meta(self):
 		return reduce_runs([s.type.Meta for s in self.sub])
 
+	def meta_str(self):
+		return "-".join(self.meta())
+
 	def merge(self, other):
 		if not isinstance(other, TransposableElement):
 			raise TypeError("Attempting to merge a non-TransposableElement")
 		if not self.compatible_with(other):
 			raise ValueError("Attempted to merge incompatible transposable elements")
 
-		self.sub = arrange_subelements(self.sub + other.sub, strand=self.strand)
+		self.sub = TransposableElement.arrange_subelements(self.sub + other.sub, strand=self.strand)
 	
 	def first(self):
 		return self.sub[0]
 
 	def last(self):
-		return self.sub[len(self.sub)-1]
+		return self.sub[-1]
 
 	def span(self):
-		return GenomicPosition(self.chrom, self.first().five_prime(), self.last().three_prime(), self.strand, strict=False)
+		return GenomicPosition(self.chrom, self.first().pos.five_prime(), self.last().pos.three_prime(), self.strand, strict=False)
 
 class ERV(TransposableElement):
 	def missing_5prime_LTR(self):
-		return self.sub[0].type.Meta != "LTR"
+		return self.first().type.Meta != "LTR"
 	
 	def missing_3prime_LTR(self):
-		return self.sub[-1].type.Meta != "LTR"
+		return self.last().type.Meta != "LTR"
 
 	def is_solo_LTR(self):
 		return self.meta() == ["LTR"]
