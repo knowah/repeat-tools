@@ -10,6 +10,7 @@ parser.add_argument("breaks",  type=int, default=100000, help="Breakpoints to me
 parser.add_argument("-s", "--seq_gap", type=int, default=0, help="Maximum (reference sequence) gap in bp between broken subelements")
 parser.add_argument("-r", "--rep_gap", type=int, default=1, help="Maximum gap between repEnd & repStart of broken subelements")
 parser.add_argument("-f", "--fix", action="store_true", help="Merge subelements at the breakpoint when unambiguous [NOT IMPLEMENTED]")
+parser.add_argument("--alt_format", action="store_true", help="Use alternative input format (e.g. from mouse strain genomes)")
 args = parser.parse_args()
 
 if args.fix:
@@ -38,21 +39,43 @@ def process_line(ln):
 	return entry
 	#return [(tokens[i] if i not in num_fields else int(tokens[i])) for i in [5,6,7,9,10,11,12,13,14,16]]
 
+def process_line_alt(ln):
+	tokens = ln.rstrip('\n').split('\t')
+	#chrom chromStart chromEnd name score strand swScore milliDiv milliDel milliIns genoLeft repClass repFamily repStart repEnd repLeft
+	entry = RM_Entry()
+	entry.chrom  = tokens[0]
+	entry.start  = int(tokens[1])
+	entry.end    = int(tokens[2])
+	entry.strand = tokens[5]
+	entry.repName   = tokens[3]
+	entry.repClass  = tokens[11]
+	entry.repFamily = tokens[12]
+	entry.repStart = abs(int(tokens[13]))
+	entry.repEnd   = int(tokens[14])
+	entry.element_ID = lineno
+	return entry
+		
+
 # process RepeatMasker file by line
 if args.infile.endswith(".gz"):
 	fopen = gzip.open
 else:
 	fopen = open
 
+read_entry = process_line if not args.alt_format else process_line_alt
+
 with fopen(args.infile, 'rt') as inf:
-	prev = process_line(inf.readline())
+	lineno = 1
+	firstln = inf.readline()
+	if firstln.startswith('#'):
+		firstln = inf.readline()
+	prev = read_entry(firstln)
 	merge_elements = False
 	elem_ids = (None, None) # when merge_elements == True, this stores the element IDs to merge
 
-	lineno = 1
 	for line in inf:
-		curr = process_line(line)
 		lineno += 1
+		curr = read_entry(line)
 
 		# fail if input file not sorted
 		if prev.chrom == curr.chrom and curr.start < prev.start:
