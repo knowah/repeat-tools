@@ -3,6 +3,15 @@
 from itertools import groupby
 import pyranges as pr
 
+def RMEntryAsTE(rm_line):
+	entry = rm_line.rstrip('\n').split('\t')
+	etype = ElementType(entry[5], entry[6], entry[4])
+	epos = GenomicPosition(entry[0], int(entry[1]), int(entry[2]), entry[3])
+	ereppos = [int(entry[7]), int(entry[8])] if len(entry) >= 9 else None
+	eid = int(entry[9]) if len(entry) >= 10 else None
+	
+	return TransposableElement(Subelement(etype, epos, ereppos), eid)
+
 class ElementType:
 	def __init__(self, rep_class, rep_family, rep_name, meta_type=None):
 		self.Class = rep_class
