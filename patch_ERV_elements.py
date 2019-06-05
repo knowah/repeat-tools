@@ -10,6 +10,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("rmsk_file", type=str, help="RepeatMasker reference file")
 parser.add_argument("meta_file", type=str, help="Tab-separated file with two columns: element names, and their 'meta' types (e.g., 'internal' and 'LTR')")
 parser.add_argument("-g", "--max_gap", type=int, help="Maximum gap [bp] between elements to be merged")
+parser.add_argument("-i", "--ignore_missing", action="store_true", help="Ignore elements missing a meta type entry (useful for only patching and outputting elements of known subtypes)")
 args = parser.parse_args()
 
 if args.rmsk_file.endswith(".gz"):
@@ -36,6 +37,9 @@ with fopen(args.rmsk_file, 'rt') as inf:
 		entry = line.rstrip('\n').split('\t')
 		elem_ID = int(entry[9]) 
 		
+		if entry[4] not in meta_types and args.ignore_missing:
+			continue
+
 		try:
 			entry_elem = TE.ERV(TE.Subelement(TE.ElementType(entry[5], entry[6], entry[4], meta_types[entry[4]]), TE.GenomicPosition(entry[0], int(entry[1]), int(entry[2]), entry[3]), [int(entry[7]), int(entry[8])]), elem_ID)
 			
@@ -132,4 +136,4 @@ for elem in elements.values():
 	if elem.strand == "-":
 		subs = elem.sub[::-1]
 	for subelem in subs:
-		print("\t".join([str(x) for x in subelem.pos, sub.type.Name, sub.type.Class, subelem.type.Family, subelem.rep_start, subelem.rep_end, elem.id]))
+		print("\t".join([str(x) for x in (subelem.pos, sub.type.Name, sub.type.Class, subelem.type.Family, subelem.rep_start, subelem.rep_end, elem.id)]))
