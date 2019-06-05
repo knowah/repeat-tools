@@ -2,6 +2,7 @@
 
 import argparse
 import sys
+import gzip
 
 parser = argparse.ArgumentParser()
 parser.add_argument("infile",  type=str, help="Input (tab-separated) RepeatMasker file (must be sorted)")
@@ -38,7 +39,12 @@ def process_line(ln):
 	#return [(tokens[i] if i not in num_fields else int(tokens[i])) for i in [5,6,7,9,10,11,12,13,14,16]]
 
 # process RepeatMasker file by line
-with open(args.infile) as inf:
+if args.infile.endswith(".gz"):
+	fopen = gzip.open
+else:
+	fopen = open
+
+with fopen(args.infile, 'rt') as inf:
 	prev = process_line(inf.readline())
 	merge_elements = False
 	elem_ids = (None, None) # when merge_elements == True, this stores the element IDs to merge
