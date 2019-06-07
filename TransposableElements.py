@@ -85,7 +85,7 @@ class GenomicPosition:
 		return GenomicPosition(self.chrom, self.start - flank, self.end, self.strand)
 
 	def __str__(self):
-		return "{}\t{}\t{}\t{}".join(self.chrom, self.start, self.end, self.strand)
+		return str.format("{}\t{}\t{}\t{}", self.chrom, self.start, self.end, self.strand)
 
 	def pr(self):
 		return pr.PyRanges(chromosomes=[self.chrom], starts=[self.start], ends=[self.end], strands=[self.strand])	

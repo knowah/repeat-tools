@@ -136,4 +136,4 @@ for elem in elements.values():
 	if elem.strand == "-":
 		subs = elem.sub[::-1]
 	for subelem in subs:
-		print("\t".join([str(x) for x in (subelem.pos, sub.type.Name, sub.type.Class, subelem.type.Family, subelem.rep_start, subelem.rep_end, elem.id)]))
+		print("\t".join([str(x) for x in (subelem.pos, subelem.type.Name, subelem.type.Class, subelem.type.Family, subelem.rep_pos[0], subelem.rep_pos[1], elem.id)]))
