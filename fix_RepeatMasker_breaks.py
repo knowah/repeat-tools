@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 import argparse
 import sys
@@ -6,7 +6,7 @@ import gzip
 
 parser = argparse.ArgumentParser()
 parser.add_argument("infile",  type=str, help="Input (tab-separated) RepeatMasker file (must be sorted)")
-parser.add_argument("breaks",  type=int, default=100000, help="Breakpoints to merge upon [default: 100000]")
+parser.add_argument("breaks",  type=int, default=500000, help="Breakpoints to merge upon [default: 500000]")
 parser.add_argument("-s", "--seq_gap", type=int, default=0, help="Maximum (reference sequence) gap in bp between broken subelements")
 parser.add_argument("-r", "--rep_gap", type=int, default=1, help="Maximum gap between repEnd & repStart of broken subelements")
 parser.add_argument("-f", "--fix", action="store_true", help="Merge subelements at the breakpoint when unambiguous [NOT IMPLEMENTED]")
